@@ -1,0 +1,15 @@
+# Vivado generated files
+*.log
+*.jou
+*.backup.*
+*.pb
+*.wdb
+*.dmp
+
+# Vivado build and sim folders
+251017_RISC_V_MulltiCycle.cache/
+251017_RISC_V_MulltiCycle.hw/
+251017_RISC_V_MulltiCycle.ip_user_files/
+251017_RISC_V_MulltiCycle.sim/
+xsim.dir/
+.Xil/
