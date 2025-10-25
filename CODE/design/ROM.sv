@@ -27,6 +27,6 @@ module ROM (
     rom[10] = 32'b000000000011_00001_001_01100_0010011;// slli x12, x1, 1 // 2b00001011 << 3
    */ 
     end
-
+ 
     assign data = rom[addr[31:2]];
 endmodule

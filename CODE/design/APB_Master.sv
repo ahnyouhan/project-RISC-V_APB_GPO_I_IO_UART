@@ -13,14 +13,17 @@ module APB_Master (
     output logic        PSEL1,
     output logic        PSEL2,
     output logic        PSEL3,
+    output logic        PSEL4,
     input  logic [31:0] PRDATA0,
     input  logic [31:0] PRDATA1,
     input  logic [31:0] PRDATA2,
     input  logic [31:0] PRDATA3,
+    input  logic [31:0] PRDATA4,
     input  logic        PREADY0,
     input  logic        PREADY1,
     input  logic        PREADY2,
     input  logic        PREADY3,
+    input  logic        PREADY4,
     // Internal Interface Signals
     input  logic        transfer,
     output logic        ready,
@@ -29,8 +32,8 @@ module APB_Master (
     input  logic [31:0] wdata,
     output logic [31:0] rdata
 );
-    logic [3:0] pselx;
-    logic [1:0] mux_sel;
+    logic [4:0] pselx;
+    logic [2:0] mux_sel;
     logic decoder_en;
     logic [31:0] temp_addr_reg, temp_addr_next, temp_wdata_reg, temp_wdata_next;
     logic temp_write_reg, temp_write_next;
@@ -39,6 +42,7 @@ module APB_Master (
     assign PSEL1 = pselx[1];
     assign PSEL2 = pselx[2];
     assign PSEL3 = pselx[3];
+    assign PSEL4 = pselx[4];
 
     typedef enum {
         IDLE,
@@ -115,10 +119,12 @@ module APB_Master (
         .rdata1(PRDATA1),
         .rdata2(PRDATA2),
         .rdata3(PRDATA3),
+        .rdata4(PRDATA4),
         .ready0(PREADY0),
         .ready1(PREADY1),
         .ready2(PREADY2),
         .ready3(PREADY3),
+        .ready4(PREADY4),
         .rdata (rdata),
         .ready (ready)
     );
@@ -128,44 +134,48 @@ endmodule
 module APB_Decoder (
     input  logic        en,
     input  logic [31:0] sel,
-    output logic [ 3:0] y,
-    output logic [ 1:0] mux_sel
+    output logic [ 4:0] y,
+    output logic [ 2:0] mux_sel
 );
     always_comb begin
-        y = 4'b0000;
+        y = 5'b0000;
         if (en) begin
             casex (sel)
-                32'h1000_0xxx: y = 4'b0001;
-                32'h1000_1xxx: y = 4'b0010;
-                32'h1000_2xxx: y = 4'b0100;
-                32'h1000_3xxx: y = 4'b1000;
+                32'h1000_0xxx: y = 5'b00001;
+                32'h1000_1xxx: y = 5'b00010;
+                32'h1000_2xxx: y = 5'b00100;
+                32'h1000_3xxx: y = 5'b01000;
+                32'h1000_4xxx: y = 5'b10000;
             endcase
         end
     end
 
     always_comb begin
-        mux_sel = 2'dx;
+        mux_sel = 3'dx;
         if (en) begin
             casex (sel)
-                32'h1000_0xxx: mux_sel = 2'd0;
-                32'h1000_1xxx: mux_sel = 2'd1;
-                32'h1000_2xxx: mux_sel = 2'd2;
-                32'h1000_3xxx: mux_sel = 2'd3;
+                32'h1000_0xxx: mux_sel = 3'd0;
+                32'h1000_1xxx: mux_sel = 3'd1;
+                32'h1000_2xxx: mux_sel = 3'd2;
+                32'h1000_3xxx: mux_sel = 3'd3;
+                32'h1000_4xxx: mux_sel = 3'd4;
             endcase
         end
     end
 endmodule
 
 module APB_Mux (
-    input  logic [ 1:0] sel,
+    input  logic [ 2:0] sel,
     input  logic [31:0] rdata0,
     input  logic [31:0] rdata1,
     input  logic [31:0] rdata2,
     input  logic [31:0] rdata3,
+    input  logic [31:0] rdata4,
     input  logic        ready0,
     input  logic        ready1,
     input  logic        ready2,
     input  logic        ready3,
+    input  logic        ready4,
     output logic [31:0] rdata,
     output logic        ready
 );
@@ -173,20 +183,22 @@ module APB_Mux (
     always_comb begin
         rdata = 32'b0;
         case (sel)
-            2'd0: rdata = rdata0;
-            2'd1: rdata = rdata1;
-            2'd2: rdata = rdata2;
-            2'd3: rdata = rdata3;
+            3'd0: rdata = rdata0;
+            3'd1: rdata = rdata1;
+            3'd2: rdata = rdata2;
+            3'd3: rdata = rdata3;
+            3'd4: rdata = rdata4;
         endcase
     end
 
     always_comb begin
         ready = 1'b0;
         case (sel)
-            2'd0: ready = ready0;
-            2'd1: ready = ready1;
-            2'd2: ready = ready2;
-            2'd3: ready = ready3;
+            3'd0: ready = ready0;
+            3'd1: ready = ready1;
+            3'd2: ready = ready2;
+            3'd3: ready = ready3;
+            3'd4: ready = ready4;
         endcase
     end
 endmodule

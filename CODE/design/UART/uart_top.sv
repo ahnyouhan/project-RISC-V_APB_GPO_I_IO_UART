@@ -5,18 +5,26 @@ module uart_top (
     input  logic       rst,
     input  logic       rx,
     output logic       tx,
+
+    // APB Slave와 연결 port
+    // CPU Read
     output logic [7:0] o_rx_popdata,
-    output logic       rx_trigger
+    output logic       o_rx_valid, // rx_trigger
+    input logic        i_rx_pop, // rx_pop cpu가 데이터를 읽어감
+
+    // CPU Write
+    input logic [7:0]  i_tx_pushdata,
+    input logic        i_tx_push, // tx_push cpu가 데이터를 씀
+    output logic       o_tx_full // tx_fifo full
 );
 
     logic w_b_tick;
-    logic [7:0] rx_data, rx_fifo_popdata, tx_fifo_popdata;
+    logic [7:0] rx_data, tx_fifo_popdata;
     logic rx_done;
     logic tx_busy;
-    logic rx_fifo_empty, tx_fifo_full, tx_fifo_empty;
+    logic rx_fifo_empty, tx_fifo_empty;
 
-    assign o_rx_popdata = rx_fifo_popdata;
-    assign rx_trigger   = ~rx_fifo_empty;
+    assign o_rx_valid   = ~rx_fifo_empty;
 
     baud_tick_gen U_BAUD_TICK (
         .clk(clk),
@@ -38,8 +46,8 @@ module uart_top (
         .rst  (rst),
         .wData(rx_data),          // push data
         .wr   (rx_done),          // PUSH
-        .rd   (~tx_fifo_full),    // POP
-        .rData(rx_fifo_popdata),  // pop data
+        .rd   (i_rx_pop),    // POP // cpu가 읽어갈 때
+        .rData(o_rx_popdata),  // pop data   rx_fifo_popdata
         .full (),
         .empty(rx_fifo_empty)
     );
@@ -47,11 +55,11 @@ module uart_top (
     fifo_top U_FIFO_TX (
         .clk  (clk),
         .rst  (rst),
-        .wData(rx_fifo_popdata),  // push data
-        .wr   (~rx_fifo_empty),   // PUSH
-        .rd   (~tx_busy),         // POP
+        .wData(i_tx_pushdata),  // push data // cpu가 쓸 때
+        .wr   (i_tx_push),   // PUSH push 신호는 cpu가 데이터를 쓸 때
+        .rd   (~tx_busy),         // POP 자동으로 데이터 전송할 때
         .rData(tx_fifo_popdata),  //pop data
-        .full (tx_fifo_full),
+        .full (o_tx_full),          // fifo가 full인지 cpu에게 알려줌
         .empty(tx_fifo_empty)
     );
 

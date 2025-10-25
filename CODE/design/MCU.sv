@@ -6,7 +6,11 @@ module MCU (
     // External Port
     output logic [7:0] gpo,
     input logic  [7:0] gpi,
-    inout logic  [7:0] gpio
+    inout logic  [7:0] gpio,
+
+    // UART Port
+    output logic        txd,
+    input  logic        rxd
 );
 
     wire         PCLK = clk;
@@ -46,6 +50,11 @@ module MCU (
     logic        PREADY_GPI;
     logic        PREADY_GPIO;
 
+    // slave 4 uart 신호
+    logic        PSEL_UART;
+    logic [31:0] PRDATA_UART;
+    logic        PREADY_UART;
+
     assign write = busWe;
     assign addr = busAddr;
     assign wdata = busWData;
@@ -72,7 +81,10 @@ module MCU (
         .PREADY0(PREADY_RAM),
         .PREADY1(PREADY_GPO),
         .PREADY2(PREADY_GPI),
-        .PREADY3(PREADY_GPIO)
+        .PREADY3(PREADY_GPIO),
+        .PSEL4  (PSEL_UART),
+        .PRDATA4(PRDATA_UART),
+        .PREADY4(PREADY_UART)
     );
 
     RAM U_RAM (
@@ -101,6 +113,13 @@ module MCU (
         .PSEL(PSEL_GPIO),
         .PRDATA(PRDATA_GPIO),
         .PREADY(PREADY_GPIO)
+    );
+
+    UART_Periph U_UART_Periph (
+        .*,
+        .PSEL   (PSEL_UART),
+        .PRDATA (PRDATA_UART),
+        .PREADY (PREADY_UART)
     );
 
 endmodule
