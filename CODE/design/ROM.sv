@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-
+       
 module ROM (
     input  logic [31:0] addr,
     output logic [31:0] data

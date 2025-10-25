@@ -28,58 +28,109 @@
 #define UART_RX_VALID (1u << 0) // bit 0: 수신 데이터 있음
 #define UART_TX_FULL  (1u << 1) // bit 1: 송신 FIFO 꽉 참
 
-// --- 모드 스위치 핀 정의 (GPIO[7:4]) ---
+// --- 모드 스위치 핀 정의 (GPIO[7:5]) ---
 #define MODE_SWITCH_PORT  GPIO_IDR
-#define MODE_LED_LEFT     (1u << 7)  // GPIO[7]
-#define MODE_LED_RIGHT    (1u << 6)  // GPIO[6]
-#define MODE_GPI_TO_GPO   (1u << 5)  // GPIO[5]
-#define MODE_UART_ECHO    (1u << 4)  // GPIO[4]
+#define SW_LED_LEFT     (1u << 7)  // GPIO[7]
+#define SW_LED_RIGHT    (1u << 6)  // GPIO[6]
+#define SW_GPI_TO_GPO   (1u << 5)  // GPIO[5]
+
+// --- 모드 정의 ---
+#define MODE_NONE         0
+#define MODE_LED_LEFT     1
+#define MODE_LED_RIGHT    2
+#define MODE_GPI_TO_GPO   3
 
 void System_init();
 void delay(uint32_t t);
 void LED_write(uint32_t data);
 void LED_leftShift(uint32_t *);
 void LED_rightShift(uint32_t *);
-// enum{LEFT, RIGHT};
 
 int main()
 {
     int ledData = 0x01;
-    uint32_t mode;
     uint32_t status;
 
+    uint32_t prev_switch = 0; // 이전 모드 저장 변수
+    uint32_t active_mode = MODE_NONE; // 현재 활성 모드 변수
+    
+    uint32_t current_switch; // 현재 스위치 상태 변수
+
     System_init();
+
     while(1){
-        mode = MODE_SWITCH_PORT;
-        
-        if(mode & MODE_LED_LEFT){
-            // 왼쪽 시프트 모드
+        // uart 상시 동작
+        status = UART_STATUS;
+        if(status & UART_RX_VALID){
+            uint32_t rxData = UART_RXDATA & 0xff;
+            // [수정] 수신된 데이터(rxData)에 따라 모드 변경
+            if (rxData == 'L') {
+                active_mode = MODE_LED_LEFT;
+                LED_write(ledData); // 모드 변경 시 즉시 반영
+            } else if (rxData == 'R') {
+                active_mode = MODE_LED_RIGHT;
+                LED_write(ledData); // 모드 변경 시 즉시 반영
+            } else if (rxData == 'O') {
+                active_mode = MODE_GPI_TO_GPO;
+                ledData = 0x01;
+            } else {
+                // 'L', 'R', 'O' 외 다른 문자를 받으면 끔
+                active_mode = MODE_NONE;
+            }
+
+            // 수신된 데이터를 다시 송신
+            while(UART_STATUS & UART_TX_FULL); // 송신 준비 대기
+            UART_TXDATA = rxData;
+        }
+
+        // 모드 변경 감지
+        uint32_t current_switch = MODE_SWITCH_PORT;
+        uint32_t new_press = current_switch & ~prev_switch; // 새로 눌린 스위치
+        uint32_t new_release = ~current_switch & prev_switch; // 새로 떼어진 스위치
+        prev_switch = current_switch; // 이전 모드 업데이트
+
+        // 새로 눌린 스위치가 있으면, 그 스위치로 모드 변경 (우선순위: 7 > 6 > 5)
+        if (new_press & SW_LED_LEFT) {
+            active_mode = MODE_LED_LEFT;
+        } else if (new_press & SW_LED_RIGHT) {
+            active_mode = MODE_LED_RIGHT;
+        } else if (new_press & SW_GPI_TO_GPO) {
+            active_mode = MODE_GPI_TO_GPO;
+            ledData = 0x01;
+        }
+
+        // 스위치가 떼어졌을 때, 떼어진 스위치가 현재 활성 모드였다면?
+        if (new_release & active_mode) {
+            // 현재 모드(A)가 꺼졌으므로, 다른 켜져있는 스위치로 모드를 복구
+            if (current_switch & SW_LED_LEFT) {
+                active_mode = MODE_LED_LEFT;
+            } else if (current_switch & SW_LED_RIGHT) {
+                active_mode = MODE_LED_RIGHT;
+            } else if (current_switch & SW_GPI_TO_GPO) {
+                active_mode = MODE_GPI_TO_GPO;
+                ledData = 0x01;
+            } else {
+                active_mode = MODE_NONE; // 켜진 스위치가 아무것도 없으면 기본 모드
+                ledData = 0x01;
+            }
+            
+        }
+
+        // active_mode에 따른 동작 수행
+        if(active_mode == MODE_LED_LEFT){
             LED_write(ledData);
             delay(200);
             LED_leftShift(&ledData);
-        } else if(mode & MODE_LED_RIGHT){
-            // 오른쪽 시프트 모드
+        } else if(active_mode == MODE_LED_RIGHT){
             LED_write(ledData);
             delay(200);
             LED_rightShift(&ledData);
-        } else if(mode & MODE_GPI_TO_GPO){
-            // GPI 입력을 GPO 출력으로 전달
+        } else if(active_mode == MODE_GPI_TO_GPO){
             uint32_t gpiData = (*(uint32_t *)&GPI_IDR) & 0xff;
             LED_write(gpiData);
-        } else if(mode & MODE_UART_ECHO){
-            // UART 에코 모드
-            LED_write(0x00); 
-            status = UART_STATUS;
-            if(status & UART_RX_VALID){
-                uint32_t rxData = UART_RXDATA & 0xff;
-                // 수신된 데이터를 다시 송신
-                while(UART_STATUS & UART_TX_FULL); // 송신 준비 대기
-                UART_TXDATA = rxData;
-            }
-            ledData = 0x01; // LED 끔
-        } else{ // 기본 모드
-            LED_write(0x00); // 모든 LED 끔
-            ledData = 0x01;
+        } else {
+            // 모든 모드 비활성화 시 LED 끄기
+            LED_write(0x00);
         }
     }
     return 0;

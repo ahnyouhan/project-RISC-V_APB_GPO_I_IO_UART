@@ -1,0 +1,77 @@
+10001137
+fe010113
+00112e23
+00812c23
+02010413
+100047b7
+00878793
+0007a783
+fef42623
+fec42783
+0017f793
+fe0784e3
+100047b7
+00478793
+0007a783
+0ff7f793
+fef42423
+00000013
+100047b7
+00878793
+0007a783
+0027f793
+fe0798e3
+100047b7
+fe842703
+00e7a023
+fadff06f
+
+#include <stdint.h>
+
+// --- APB 및 UART 주소 정의 ---
+#define APB_BASE_ADDR 0x10000000
+#define UART_OFFSET 0x4000 // PSEL4 (32'h1000_4xxx)
+#define UART_BASE_ADDR (APB_BASE_ADDR + UART_OFFSET)
+
+// --- UART 레지스터 정의 ---
+// APB_SlaveIntf_UART 모듈의 주소 매핑에 따름
+#define UART_TXDATA (*(volatile uint32_t *)(UART_BASE_ADDR + 0x00))
+#define UART_RXDATA (*(volatile uint32_t *)(UART_BASE_ADDR + 0x04))
+#define UART_STATUS (*(volatile uint32_t *)(UART_BASE_ADDR + 0x08))
+
+// --- UART 상태 비트 정의 ---
+#define UART_RX_VALID (1u << 0) // bit 0: 수신 데이터 있음
+#define UART_TX_FULL  (1u << 1) // bit 1: 송신 FIFO 꽉 참
+
+int main()
+{
+    uint32_t status;
+    uint32_t rxData;
+
+    // GPO/GPI/GPIO 관련 초기화(System_init)는
+    // 순수 UART 테스트에서는 필요하지 않습니다.
+    
+    // MCU는 항상 무한 루프(while(1)) 안에서 동작해야 함
+    while(1){
+        
+        // 1. UART 상태 레지스터를 읽음
+        status = UART_STATUS;
+
+        // 2. 수신된 데이터가 있는지 확인 (RX_VALID 비트)
+        if (status & UART_RX_VALID) {
+            
+            // 3. 수신된 데이터를 (8비트만) 읽어옴
+            rxData = UART_RXDATA & 0xff;
+
+            // 4. 송신 FIFO가 꽉 찼는지 확인 (TX_FULL 비트)
+            while (UART_STATUS & UART_TX_FULL) {
+                // 꽉 찼으면 비워질 때까지 대기
+            }
+            
+            // 5. 읽었던 데이터를 TXDATA 레지스터에 다시 씀
+            UART_TXDATA = rxData;
+        }
+        
+    } // end of while(1)
+    
+}
