@@ -82,9 +82,31 @@ class apbSignal;
     endtask
 
     // ---------------- UART TX Receive (mock) ----------------
+    
     task receive_uart();
-        #(1000000); // 1ms 대기
-        t.received_data = t.wdata[7:0];
+        logic [7:0] data_buffer;
+        
+        // 1. Start bit 대기 (idle '1' -> '0')
+        @(negedge m_if.tx);
+        
+        // 2. Start bit의 중간 지점으로 이동
+        #(50000); 
+
+        // 3. 8개 데이터 비트 수신
+        for (int i = 0; i < 8; i++) begin
+            #(100000); // 다음 비트 중간 지점으로 이동
+            data_buffer[i] = m_if.tx;
+        end
+
+        // 4. Stop bit 대기 (데이터 수신 완료)
+        #(100000); 
+        
+        // 5. 수신된 데이터를 transaction에 저장
+        t.received_data = data_buffer;
+        
+        // 6. tx 신호가 다시 idle(1)로 돌아가는지 확인 (선택 사항)
+        @(posedge m_if.tx); 
+
         t.print("UART_TX_RECV");
     endtask
 
@@ -106,16 +128,30 @@ class apbSignal;
             t.wdata = 8'h41 + i;      // 'A', 'B', 'C' ...
             t.send_data = 8'h30 + i;  // '0', '1', '2' ...
 
-            send(32'h1000_4000, {24'h0, t.wdata[7:0]});
-
+            // 1. [수정됨] UART 수신(receive_uart)을 먼저 백그라운드에서 실행
+            //    (tx 핀을 미리 감시하고 있도록)
             fork
                 receive_uart();
             join_none
 
+            // 2. [수정됨] APB Write로 DUT에 전송 명령
+            //    (이 명령이 DUT의 TX 전송을 "트리거"함)
+            send(32'h1000_4000, {24'h0, t.wdata[7:0]});
+
+            // --- (이하는 원래 코드와 동일) ---
+
+            // 3. DUT의 RX 핀으로 데이터 전송
             send_uart(t.send_data);
-            #(1000000);
+            
+            // 4. forked된 receive_uart가 끝날 때까지 충분히 대기
+            //    (receive_uart는 약 1ms = 1,000,000 ns 소요됨)
+            #(1000000); 
+            
+            // 5. DUT의 다른 레지스터 읽기 (RX 데이터, 상태 등)
             receive(32'h1000_4004);
             receive(32'h1000_4008);
+            
+            // 6. 비교 (이때쯤이면 forked된 receive_uart가 t.received_data를 갱신했을 것)
             compare();
         end
 
@@ -197,7 +233,7 @@ module tb_APB_UART_verif();
         #100;
 
         apbSignalTester = new(m_if);
-        apbSignalTester.run(5); // ✅ 5회 루프 테스트
+        apbSignalTester.run(100); // ✅ 5회 루프 테스트
 
         $display("========== Simulation Complete ==========");
         $finish;

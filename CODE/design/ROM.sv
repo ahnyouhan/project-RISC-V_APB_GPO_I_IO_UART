@@ -7,7 +7,8 @@ module ROM (
     logic [31:0] rom[0:2**15-1];
 
     initial begin
-        //$readmemh("code.mem", rom); 
+        $readmemh("code.mem", rom); 
+        /*
         // R-Type Instructions (opcode = 0110011)
         rom[0] = 32'b0000000_00001_00010_000_00100_0110011;  // add x4, x2, x1
         rom[1] = 32'b0100000_00001_00010_000_00101_0110011;  // sub x5, x2, x1
@@ -43,7 +44,7 @@ module ROM (
 
         // I-Type (Jump and Link Register) Instruction (opcode = 1100111)
         rom[20] = 32'b00000000111000001000101011100111; // jalr x19, x17, 0 (rd=x19, rs1=x17, funct3=000, imm=0 -> target=x17+0, x19=PC+4)
-
+        */
     end
 
     assign data = rom[addr[31:2]];
