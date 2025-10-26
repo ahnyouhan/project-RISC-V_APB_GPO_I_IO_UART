@@ -25,7 +25,13 @@ module tb_mcu();
     logic reset;
     logic [3:0] gpo;
 
-    MCU dut(.*);
+    MCU dut(.*,
+        .gpo(gpo),
+        .gpi(),
+        .gpio(),
+        .txd(),
+        .rxd()
+    );
 
     always #5 clk = ~clk;
 
